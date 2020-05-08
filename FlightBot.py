@@ -1,24 +1,22 @@
+import time
 from time import strftime, sleep
 from datetime import datetime, timedelta
+import sqlite3
+from sqlite3 import Error
 from random import randint
-import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import StaleElementReferenceException
 import os
 import re
-import smtplib
+from statistics import mean, median
+#import smtplib
 
-#chromedriver_path = os.path.abspath("chromedriver_linux64/chromedriver.exe")
-#print(chromedriver_path)
-#chromedriver_path = '/home/viktor/chromedrivezr_linux64/chromedriver.exe'
-driver = webdriver.Chrome()
-# Only works because I added Chrome to path. Maybe remove it and figure the
-#other way out to make it work better on the Pi
-
-Airports = ("Aarhus", "Aberdeen Ltd", "Abu Dhabi", "Acapulco", "Adana-Sakirpasa", "Addis Ababa-Bole", "Adelaide", "Aden", "Aerodrom Portoroz doo", "Agadir – Al Massira", "Agen – La Garenne", "Agra", "Ahmedabad – Sardar Vallabh Bhai Patel Int´l", "Ajaccio – Campo Dell´Oro", "Akron-Canton Regional", "Alamosa-Bergman-San Luis Valley Regional Airfield", "Albany", "Albi – Le Sequestre", "Albuquerque", "Alderney", "Aleppo", "Alesund-Vigra", "Alexandria", "Alexandria – El Nhouza", "Alexandroupolis National", "Alghero-Fertilia", "Algiers-Houari Boumedienne", "Alicante", "Alice Springs", "Almaty Int´l", "Almeria", "Alor Setar – Sultan Abdul Halim", "Altenrhein", "Amarillo – Rick Husband", "Amilcar Cabral", "Amman-Queen Alia", "Amritsar – Raja Sansi", "Amsterdam Schiphol", "Anchorage – Ted Stevens", "Ancona", "Angoulême – Brie-Champniers", "Ankara – Esenboga", "Annaba-Rabah Bitat", "Annecy – Haute Savoie", "Antalya", "Antananarivo-Ivato Aerodrome", "Antigua-VC Bird", "Antofagasta-Cerro Moreno", "Antwerp", "Appleton/Outagamie County Regional", "Aqaba", "Arad", "Arica-Chacalluta", "Arkhangelsk – Talagi", "Aruba – Queen Beatrix", "Asheville Regional", "Ashkabad", "Asmara Int´l", "Asturias", "Asuncion – Silvio Pettirossi", "Aswan – Daraw", "Athens Ben Epps", "Athens – Eleftherios Venizelos", "Athens – Hellinikon", "Atlanta – Hartsfield Atlanta", "Atlantic City Int´l", "Auckland", "Augsburg", "Augusta Regional", "Austin-Bergstrom", "Avignon/Caumont", "Badajoz-Talavera la Real", "Baden-Airpark GmbH", "Baghdad", "Bahrain", "Baku – Bina Int´l", "Bali-Denpasar-Ngurah Rai", "Balikpapan-Sepinggan", "Baltimore/Washington Int´l", "Bamako-Senou Int´l", "Bandaranaike Int´l", "Bangalore", "Bangkok Int´l", "Bangor", "Bangui-M´Poko", "Banjul Int´l", "Bankstown", "Barcelona", "Bari-Palese", "Barnaul", "Barra", "Barranquilla-Aeropuerto Int´l Ernesto Cortissoz", "Basel/Mulhouse", "Basel/Mulhouse", "Baton Rouge Metroplitan", "Beauvais/Tille", "Beijing – Capital", "Beira", "Beirut", "Belfast", "Belfast", "Belfast City", "Belgrade", "Belize-Phillip SW Goldson", "Bellingham", "Belo Horizonte – Pampulha", "Belo Horizonte – Tancredo Neves Int´l",
+Airports = ("Aarhus", "Aberdeen Ltd", "Abu Dhabi", "Acapulco", "Adana-Sakirpasa", "Addis Ababa-Bole", "Adelaide", "Aden", "Aerodrom Portoroz doo", "Agadir – Al Massira", "Agen – La Ganne", "Agra", "Ahmedabad – Sardar Vallabh Bhai Patel Int´l", "Ajaccio – Campo Dell´Oro", "Akron-Canton Regional", "Alamosa-Bergman-San Luis Valley Regional Airfield", "Albany", "Albi – Le Sequestre", "Albuquerque", "Alderney", "Aleppo", "Alesund-Vigra", "Alexandria", "Alexandria – El Nhouza", "Alexandroupolis National", "Alghero-Fertilia", "Algiers-Houari Boumedienne", "Alicante", "Alice Springs", "Almaty Int´l", "Almeria", "Alor Setar – Sultan Abdul Halim", "Altenrhein", "Amarillo – Rick Husband", "Amilcar Cabral", "Amman-Queen Alia", "Amritsar – Raja Sansi", "Amsterdam Schiphol", "Anchorage – Ted Stevens", "Ancona", "Angoulême – Brie-Champniers", "Ankara – Esenboga", "Annaba-Rabah Bitat", "Annecy – Haute Savoie", "Antalya", "Antananarivo-Ivato Aerodrome", "Antigua-VC Bird", "Antofagasta-Cerro Moreno", "Antwerp", "Appleton/Outagamie County Regional", "Aqaba", "Arad", "Arica-Chacalluta", "Arkhangelsk – Talagi", "Aruba – Queen Beatrix", "Asheville Regional", "Ashkabad", "Asmara Int´l", "Asturias", "Asuncion – Silvio Pettirossi", "Aswan – Daraw", "Athens Ben Epps", "Athens – Eleftherios Venizelos", "Athens – Hellinikon", "Atlanta – Hartsfield Atlanta", "Atlantic City Int´l", "Auckland", "Augsburg", "Augusta Regional", "Austin-Bergstrom", "Avignon/Caumont", "Badajoz-Talavera la Real", "Baden-Airpark GmbH", "Baghdad", "Bahrain", "Baku – Bina Int´l", "Bali-Denpasar-Ngurah Rai", "Balikpapan-Sepinggan", "Baltimore/Washington Int´l", "Bamako-Senou Int´l", "Bandaranaike Int´l", "Bangalore", "Bangkok Int´l", "Bangor", "Bangui-M´Poko", "Banjul Int´l", "Bankstown", "Barcelona", "Bari-Palese", "Barnaul", "Barra", "Barranquilla-Aeropuerto Int´l Ernesto Cortissoz", "Basel/Mulhouse", "Basel/Mulhouse", "Baton Rouge Metroplitan", "Beauvais/Tille", "Beijing – Capital", "Beira", "Beirut", "Belfast", "Belfast", "Belfast City", "Belgrade", "Belize-Phillip SW Goldson", "Bellingham", "Belo Horizonte – Pampulha", "Belo Horizonte – Tancredo Neves Int´l",
 "Benbecula", "Benghazi – Benina", "Bergen, Flesland", "Bergerac-Roumaniere", "Berlin – Schönefeld", "Berlin – Tegel", "Berlin – Tempelhof", "Bermuda", "Bern", "Beziers/Vias", "Biak-Frans Kaisiepo", "Biarritz/Bayone/Anglet", "Bilbao", "Billings Logan", "Billund", "Binghamton", "Bintulu", "Birmingham", "Birmingham", "Bishkek-Manas", "Bismark Municipal", "Bissau-Osvaldo Vieira", "Blackbushe", "Blackpool", "Blantyre-Chileka", "Bloemfontein", "Bluefield – Mercer County", "Boa Vista Int´l", "Bodø", "Boeing Field/King County Int´l", "Bogotá-El Dorado", "Boise", "Bologna-G Marconi", "Bonriki Int´l", "Bordeaux/Merignac", "Borlänge", "Bornholm-Roenne", "Boston-Logan", "Bourgas", "Bourges", "Bournemouth", "Bozeman", "Bradford Regional", "Brasilia Int´l – Presidente Juscelino Kubitschek", "Bratislava – M R Stefanik", "Brazzaville – Maya Maya", "Bremen – Flughafen Bremen", "Brest/Guipavas", "Brindisi", "Brisbane", "Brisbane – Archerfield", "Bristol", "Bristol – Filton", "Brive – La Roche", "Brno-Turany", "Brownsville/South Padre Island Int´l", "Brunei-Bandar Seri Begawan", "Brussels", "Brussels-South Charleroi", "Bucaramanga – Palo Negro", "Bucharest – Baneasa", "Bucharest – Otopeni", "Budapest – Ferihegy", "Buenos Aires – Aeropuerto Ministro Pistarini Int´l Ezeiza", "Buenos Aires – Don Torcuato", "Buffalo Niagara Int´l", "Bujumbura", "Bulawayo", "Burbank-Glendale-Pasedena", "Burlington", "Cairns", "Cairo", "Calgary", "Cali-Alfonso Bonilla Aragón", "Calicut", "Calvi – Sainte Catherine", "Camagüey-Ignacio Agramonte", "Cambridge", "Camden", "Campbeltown", "Campeche – Ingeniero Alberto Acuna Ongay Int´l", "Campo Grande",
 "Canberra", "Cancun Int´l", "Canefield", "Cannes", "Cape Town", "Caracas-Maiquetia Simon Bolivar", "Carcassonne", "Cardiff", "Carlisle", "Cartagena-Rafael Nunez", "Casablanca – Mohammed V", "Casper/Natrona County Int´l", "Castres – Mazamet", "Catania-Fontanarossa", "Cayenne – Rochambeau", "Cayo Largo-Vilo Acuña Int´l", "Chambery/Aix les Bains", "Champaign – Willard", "Chania K Daskalogiannis", "Channel Islands – Alderney", "Channel Islands – Guernsey", "Channel Islands – Jersey", "Charleston-Yeager", "Charlotte/Douglas Int´l", "Chattanooga Metropolitan", "Chavenay", "Cheju – Jeju", "Chelyabinsk – Balandino", "Chengdu/Shuangliu", "Chennai/Madras – Meenambakam", "Cherbourg-Maupertus", "Chester", "Chetumal", "Cheyenne", "Chiang Mai Int´l", "Chiang Rai", "Chicago Midway", "Chicago-O´Hare", "Chisinau", "Chittagong – Shah Amanat Int´l", "Christchurch Ltd", "Châteauroux/Déols-Marcel Dassault", "Ciego de Avila-Maximo Gomez Int´l", "Cienfuegos – Jamie González Int´l", "Cincinnati/N Kentucky Int´l", "City of Derry – Londonderry", "Ciudad del Carmen", "Ciudad Obregón", "Ciudad Victoria", "Clermont Ferrand Auvergne", "Cleveland – Hopkins", "Cochin", "Cocos Islands", "Coimbatore", "Colima", "Colmar-Houssen", "Cologne/Bonn", "Colorado Springs", "Columbia Metropolitan", "Columbus – Port Columbus Int´l", "Columbus-Golden Triangle Regional", "Conakry-Gbessia", "Concepcion", "Constanta-Mihail Kogalniceanu", "Constantine", "Cook Is-Rarotonga", "Coolangatta – Gold Coast", "Copenhagen Roskilde", "Copenhagen – Kastrup", "Cordoba", "Cordoba – Ambrosio l y Taravella", "Corfu I Kapodistrias", "Cork", "Corpus Christi Int´l", "Cortez Municipal", "Corumba", "Cotonou", "Coventry – West Midlands", "Cozumel", "Crotone", "Crown Point", "Cruzeiro do Sul Int´l", "Cuernavaca", "Cumberland Regional", "Cuneo-Levaldigi", "Curacao – Hato", "Curitiba – Afonso Pena", "Dakar-Yoff – Leopol Sedar Senghor Int´l", "Dalaman", "Dalian – Zhoushuizi", "Dallas Love Field", "Dallas/Fort Worth", "Damascus", "Dammam – King Fahd", "Dane County Regional", "Dar-es-Salaam", "Darwin Int´l", "Davao Int´l", "Dayton", "Daytona Beach Int´l", "Deauville/Saint Gatien", "Decatur",
 "Delhi – Indira Ghandi", "Denver", "Des Moines", "Detroit City", "Detroit Metropolitan Wayne County", "Dhahran", "Dhaka – Zia", "Dijon-Bourgogne Aéroport", "Dinard/Plertuit/St Malo", "Djerba-Zarzis", "Djibouti – Ambouli", "Dnepropetrovsk", "Doha", "Dole/Tavaux", "Donegal Int´l", "Dortmund – Wickede", "Dothan Regional", "Douala", "Dresden", "Dubai", "Dublin", "Dubois-Jefferson County", "Dubrovnik", "Dubuque Regional", "Dundee", "Dunedin Ltd", "Durango – La Plata County", "Durban", "Dushanbe", "Düsseldorf", "Düsseldorf Express- Mönchengladbach", "East London", "East Midlands", "Eastern Iowa", "Edinburgh", "Edmonton", "Egilsstadir", "Eilat-J Hozman", "Eindhoven", "Ekaterinburg – Koltcovo", "El Paso", "El Salvador Int´l", "Elmira/Coring Regional", "Enontekiö", "Enschede Twente", "Entebbe", "Epinal/Mirecourt", "Erfurt", "Erie", "Esbjerg", "Essen/Mulheim", "Essendon", "Evansville Regional", "Exeter", "Fairbanks Int´l", "Faleolo", "Fargo – Hector", "Farnborough", "Faro", "Fayetteville Municipal – Drake Field", "Fayetteville Regional", "Fayetteville – Lincoln County Regional", "Fes Saiss", "Fiji – Suva Nausori Int´l", "Fiji-Nadi", "Flagstaff Pulliam", "Flamingo", "Flint – Bishop", "Florence Regional", "Florence – Amerigo Vespucci", "Flores", "Forli", "Fort Collins-Loveland Municipal", "Fort Lauderdale-Hollywood Int´l", "Fort McMurray", "Fort Myers-SW Florida Int´l", "Fort Pierce – St Lucie County Int´l", "Fort Smith", "Fort Wayne", "Fortaleza", "Foz do Iguaçu-Cataratas Int´l", "Franceville – Mvengue", "Francistown", "Frankfurt", "Frankfurt-Hahn", "Freetown-Lunghi", "Fresno Yosemite", "Friedrichshafen/Lowental", "Fua´amotu Int´l", "Fuerteventura", "Fujairah", "Fukui", "Funchal -o da Madeira", "Gaborone-Seretse Khama", "Gainesville Regional", "Galway", "Garoua", "Gaya",
@@ -36,8 +34,173 @@ airportCodes = ("AAL", "AAR", "ABZ", "AUH", "ACA", "ADA", "ADD", "ADL", "ADE", "
 "LAP", "LRH", "EUN", "LBU", "LAE", "LFT", "LOS", "LDU", "LHE", "LHA", "TVL", "LKL", "LBQ", "SUF", "LNS", "LGK", "LAI", "HLA", "LAN", "ACE", "LPP", "LRD", "LCA", "LAS", "LST", "LBG", "LEH", "LTQ", "LBA", "ABE", "LEJ", "LEY", "LEX", "LBV", "LPX", "LIH", "LIL", "LLW", "CLX", "LXS", "LIG", "LMH", "LNZ", "LIS", "LIT", "LPL", "LVI", "LGG", "LJU", "MDZ", "LFW", "BQH", "LCY", "LGW", "LHR", "LTN", "MSE", "SEN", "STN", "LGB", "ISP", "LPR", "LRT", "LAX", "SDF", "LAD", "LBB", "LKO", "LBC", "LUG", "LLA", "LUN", "LUX", "LXR", "LYX", "LYH", "LYS", "LYS", "MST", "MFM", "MKY", "NOP", "MAD", "MCV", "GDX", "SKG", "SSG", "AGP", "MLE", "MMX", "MLA", "MDC", "MGA", "MAO", "MHT", "MAN", "MDL", "MNL", "MZO", "MPM", "MTH", "MBX", "MHQ", "RAK", "MRS", "FDF", "MSU", "MCW", "MAM", "MTS", "MMJ", "MUB", "MZT", "MDK", "MFE", "MES", "MDE", "MKZ", "MLB", "MEL", "MLN", "MLZ", "DOM", "MEM", "MAH", "PSE", "MID", "MEI", "ETZ", "MEX", "MIA", "MAF", "MIK", "BGY", "LIN", "MXP", "MKE", "MSP", "MOT", "MSQ", "MYY", "MSJ", "MSO", "MJT", "BFM", "MOB", "MOD", "MGQ", "MOL", "MBA", "MCM", "YQM", "ROB", "MBJ", "MTY", "MUD", "MPL", "YMX", "YUL", "MNI", "MBW", "MXX", "DME", "SVO", "VKO", "OMO", "ISA", "BOM", "MUC", "MMK", "MCT", "MSR", "NGO", "NBO", "APL", "ENC", "NKG", "NTE", "ACK", "APF", "NAP", "UAK", "BNA", "NAS", "NAT", "INU", "NLA", "NEV", "NOU", "HVN", "MSY", "JFK", "LGA", "EWR", "NTL", "NCL", "NQY", "NIM", "NCE", "KIJ", "FNI", "NOG", "ORF", "NRK", "LBF", "PQI", "NWI", "NDB", "NKO", "OVB", "NLD", "NUE", "NDH", "OAK", "OAX", "ODE", "ODS", "OHD", "OKJ", "OKA", "OKC", "OLB", "OMA", "ONT", "OPO", "EOI", "NRL", "MCO", "SFB", "ITM", "KIX", "GEN", "OST", "OSR", "YOW", "OUA", "OZZ", "OUD", "OUL", "OXF", "PAD", "PPG", "PLQ", "PLM", "PMO", "PBI", "PSP", "PMI", "PNA", "PTY", "PFN", "PFO", "PBM", "PED", "CDG", "ORY", "POX", "PKB", "PBH", "PAT", "GPA", "PUF", "PEN", "PDT", "PNS", "PZE", "PIA", "PEI", "PGF", "PER", "IND", "PEW", "PKC", "PHL", "PNH", "PHX", "HKT", "POS", "GSO", "PZY", "NTY", "PSA", "DTP", "PIU", "PLB", "PBG", "PDV", "PLH", "PTP", "PNR", "PIS", "PMG", "PNK", "TAT", "POR", "CLM", "PLZ",
 "POG", "PHC", "POM", "VLI", "PAP", "PDX", "POA", "PXO", "POU", "PAZ", "POZ", "PRG", "YXS", "PVD", "PLS", "PNN", "PBC", "PMC", "POP", "PVR", "PUY", "PUQ", "FNJ", "KHI", "QRO", "UIP", "UIO", "YQB", "RBA", "RAB", "RAH", "RDU", "RAP", "RKT", "RDG", "REC", "RDM", "RHE", "RNS", "RNO", "REU", "REK", "RHI", "RHQ", "RIC", "LCK", "RIX", "RJK", "RMI", "RBR", "GIG", "GIG", "RUH", "ROA", "RST", "RSD", "RWI", "RDZ", "RUN", "CIA", "FCO", "RPN", "ROW", "RTM", "RVN", "RZE", "SCN", "QSA", "SMF", "SBK", "STX", "EBU", "SKB", "STL", "UVW", "SLU", "SXM", "STT", "SVD", "SPN", "SLL", "SLM", "SLN", "SBY", "SLC", "SLA", "SZG", "SKD", "SMI", "ADZ", "SJT", "SAT", "SAN", "SFO", "MJV", "SJC", "SJO", "SYQ", "SJU", "SBP", "SAP", "EAS", "SAH", "SDK", "TRF", "SNA", "SNA", "SMA", "SDR", "STM", "SCQ", "SCU", "SCL", "SDQ", "TMS", "SJJ", "SLK", "SRQ", "RTW", "YXE", "SUJ", "SAV", "SVL", "SEA", "SEB", "SJY", "PKW", "SDJ", "ICN", "SEL", "SVQ", "SEZ", "SFA", "SHA", "PVG", "SHN", "SHJ", "SZD", "SHE", "SZX", "LSI", "SYZ", "ESH", "SHV", "SBW", "SDY", "SIN", "SIR", "FSD", "SUX", "MRU", "SQW", "SKP", "SLD", "SXL", "SOF", "SFJ", "SBN", "SLX", "SOU", "SPU", "GEG", "SGF", "SMV", "SNR", "PIE", "LED", "LTT", "YYT", "SCE", "STA", "SVG", "SWF", "ARN", "BMA", "NYO", "SRP", "STY", "- S", "STR", "SDL", "SUB", "SOC", "LYR", "SWS", "SYD", "SYR", "SZZ", "CGH", "SAO", "VCP", "SGD", "TBJ", "PPT", "TPE", "TLL", "ACC", "TPA", "TMP", "TGT", "TNG", "LDE", "TGM", "TAY", "TAS", "TWU", "TBS", "MME", "TGU", "THR", "TCN", "TLV", "SDV", "TFN", "TFS", "TCA", "TPQ", "TRV", "TED", "YQT", "TSN", "TIA", "TRE", "TRZ", "HNT", "NRT", "TOL", "TLC", "YYZ", "TLN", "TLS", "TSV", "TOY", "TOE", "TTN", "TSF", "TRI", "TRS", "TIP", "TOS", "TRD", "TUS", "TCE", "TUL", "TUN", "TUP", "TRN", "TRK", "TGZ", "TYR", "TJM", "UHE", "ULN", "ULY", "UME", "UTN", "UPN", "URC", "UCA", "VAA", "FAE", "VAF", "VLC", "VLL", "YVR", "VRA", "VNS", "VRK", "VAR", "VCE", "VRB", "VRN", "VHY", "VFA", "YYJ", "VIE", "VTE", "VGO", "VNO", "VIJ", "VSE", "VIT", "VVO", "SKS", "VXO", "WKJ", "WLS", "WAW", "IAD", "DCA", "WAT", "ALO", "ART", "CWA", "WLG", "EAT", "HPN", "GWT", "ICT", "WIC", "WBW", "IWA", "IPT", "ILM", "WDH", "YQG", "YWG", "INT", "ORH", "WRO", "RGN", "NSI", "EVN", "JOG", "UUS", "OER", "OS")
 
+class Trip:
+	def __init__(self, idx, date, price, outbound_duration, return_duration):
+		self.idx = idx
+		self.date = date
+		self.price = price
+		self.outbound_duration = outbound_duration
+		self.return_duration = return_duration
+
+def input_date_to_datetime(input_date):
+	output_date = datetime.strptime(input_date,"%Y-%m-%d")
+	return output_date.date()
+
+def datetime_to_string(datetime_date):
+	kayak_date = datetime_date.strftime("%Y-%m-%d")
+	return kayak_date
+
+# Functions relating to the sqlite database
+#_______________________________________________________________________________
+def connect_to_database(database_file):
+	conn = None
+	try:
+		conn = sqlite3.connect(database_file)
+		return conn
+	except Error as error:
+		print(error)
+		return conn
+
+def create_sql_table(conn, sql_table):
+    try:
+        cur = conn.cursor()
+        cur.execute(sql_table)
+    except Error as error:
+        print("error creating table: " + str(error))
+
+def create_trip(conn, trip_row_format):
+	sql_command = ''' INSERT INTO
+					all_trips(id, departure_date, price, outbound_duration, return_duration)
+					VALUES(?, ?, ?, ?, ?) '''
+	cur = conn.cursor()
+	cur.execute(sql_command, trip_row_format)
+	#print(cur.lastrowid)
+	return cur.lastrowid
+
+def create_date_summary(conn, date_summary):
+	sql_command = ''' INSERT INTO
+					date_summary(id, departure_date,cheapest_price, median_price, average_price)
+					VALUES(?, ?, ?, ?, ?) '''
+	cur = conn.cursor()
+	cur.execute(sql_command, date_summary)
+	return cur.lastrowid
+
+#Functions used for scraping the webpage:
+#_______________________________________________________________________________
+def find_element_using_xpath(web_driver,element_xpath):
+	web_element = WebDriverWait(web_driver, 60).until(EC.visibility_of_element_located((By.XPATH, element_xpath)))
+	return web_element
+
+def close_popup(web_driver):
+	close_button_xpath = '//div[contains(@class, "Common-Widgets-Dialog-Dialog R9-Overlay flightsDriveBy fromBottom visible animate")]//button[contains(@id,"dialog-close")]'
+	try:
+		close_button = find_element_using_xpath(web_driver, close_button_xpath)
+		close_button.click()
+	except TimeoutException as ex:
+		print("Exception has been thrown. " + str(ex))
+		return
+
+def get_prices(web_driver):
+	# There was a StaleElementReferenceException that kept being thrown as a result of the page reloading
+	# while the scraping was occurring. The try/except structures ensures that the data is obtained and
+	# the script keeps going
+	sleep(randint(5,7))
+	price_xpath = '//span[contains(@id, "price-text")]'
+	try:
+		price_list = [price.text.replace('$','') for price in web_driver.find_elements_by_xpath(price_xpath) if price.text != '']
+	except StaleElementReferenceException as ex:
+		print("stale element reference exception while getting prices. Attempting again.")
+		sleep(7)
+		price_list = [price.text.replace('$','') for price in web_driver.find_elements_by_xpath(price_xpath) if price.text != '']
+		#Goes through the prices and gets rid of the $ sign for all the elements
+	price_list = list(map(int, price_list))
+	return price_list
+
+def get_flight_durations(web_driver):
+	# There was a StaleElementReferenceException that kept being thrown as a result of the page reloading
+	# while the scraping was occurring. The try/except structures ensures that the data is obtained and
+	# the script keeps going
+	sleep(randint(1,3))
+	outbound_duration_xpath = '//div[contains(@id, "info-leg-0") ]//div[contains(@class, "duration")]/div[@class="top"]'
+	return_duration_xpath = '//div[contains(@id, "info-leg-1") ]//div[contains(@class, "duration")]/div[@class="top"]'
+	try:
+		outbound_durations_list =[duration.text for duration in web_driver.find_elements_by_xpath(outbound_duration_xpath)]
+	except StaleElementReferenceException as ex:
+		print("stale element reference exception while getting outbound durations. Attempting again.")
+		sleep(7)
+		outbound_durations_list =[duration.text for duration in web_driver.find_elements_by_xpath(outbound_duration_xpath)]
+	try:
+		return_durations_list = [duration.text for duration in web_driver.find_elements_by_xpath(return_duration_xpath)]
+	except StaleElementReferenceException as ex:
+		print("stale element reference exception while getting return durations. Attempting again.")
+		sleep(7)
+		return_durations_list = [duration.text for duration in web_driver.find_elements_by_xpath(return_duration_xpath)]
+	return outbound_durations_list, return_durations_list
+
+def increment_date(web_driver, kayak_link,current_outbound_date, duration):
+	#Randomly switching between two different methods of incrementing to try and stop Recptchas from appearing
+	current_return_date = current_outbound_date + timedelta(days = duration)
+	n = randint(1,7)
+
+	if n>=3:
+		kayak_link = "https://www.kayak.com/flights/" + airport_codes + "/" + datetime_to_string(current_outbound_date) + "/" + datetime_to_string(current_return_date)
+		web_driver.get(kayak_link)
+		print("new link")
+		sleep(5)
+	else:
+		departure_date_inc_xpath = '//button[contains(@id, "dateRangeInput-start-inc")]'
+		return_date_inc_xpath = '//button[contains(@id, "dateRangeInput-end-inc")]'
+		submit_xpath = '//div[contains(@id, "submit")]'
+
+		departure_date_inc_button = find_element_using_xpath(web_driver,departure_date_inc_xpath)
+		departure_date_inc_button.click()
+		return_date_inc_button = find_element_using_xpath(web_driver,return_date_inc_xpath)
+		return_date_inc_button.click()
+		date_submit_button = find_element_using_xpath(web_driver,submit_xpath)
+		date_submit_button.click()
+
+def scrape_page(web_driver, conn, current_outbound_date):
+#Obtains prices and flight durations of flights and stores them in the database tables
+	sleep(randint(8,10))
+	prices = get_prices(web_driver)
+	flight_durations = get_flight_durations(web_driver)
+	print(prices)
+	id_null = None
+	if prices:
+		create_date_summary(conn, (id_null, current_outbound_date, min(prices), median(prices), mean(prices)))
+		for idx, price in enumerate(prices):
+			create_trip(conn, (id_null, current_outbound_date, price,flight_durations[0][idx],flight_durations[1][idx]))
+			conn.commit()
+
+#main code:
+#_______________________________________________________________________________
+driver = webdriver.Chrome()
+# Only works because I added Chrome to path. Maybe move it and figure the
+# other way out to make it work better on the Raspberry Pi
+conn = connect_to_database('FlightBotDB.sqlite')
+cur = conn.cursor()
+
+all_trips_table_sql = """ CREATE TABLE IF NOT EXISTS all_trips(
+						 	id integer PRIMARY KEY,
+							departure_date text,
+							price integer,
+							outbound_duration text,
+							return_duration text
+							); """
+date_summary_table_sql = """ CREATE TABLE IF NOT EXISTS date_summary(
+							id integer PRIMARY KEY,
+							departure_date text,
+							cheapest_price int,
+							median_price int,
+							average_price int
+							); """
+
+create_sql_table(conn, all_trips_table_sql)
+create_sql_table(conn, date_summary_table_sql)
 
 
+input_outbound_date = input("Enter a start date in YYYY-MM-DD format")
+duration = 7;
 #while True:
 #	try:
 #    	inputOrigin = int(input("Please enter the duration of your trip in days"))
@@ -46,133 +209,29 @@ airportCodes = ("AAL", "AAR", "ABZ", "AUH", "ACA", "ADA", "ADD", "ADL", "ADE", "
 #        continue
 #    else:
 #        break
-class Trip:
-	def __init__(self,idx,date, price, outboundDuration, returnDuration):
-		self.idx = idx
-		self.date = date
-		self.price = price
-		self.outboundDuration = outboundDuration
-		self.returnDuration = returnDuration
+airport_codes = "STO-TYO"
+start_time = time.time()
+current_outbound_date = input_date_to_datetime(input_outbound_date)
+current_return_date = current_outbound_date + timedelta(days=duration)
 
-def inputDate2DateTime(inputDate):
-	outputDate = datetime.strptime(inputDate,"%Y-%m-%d")
-	return outputDate
+kayak_link = "https://www.kayak.com/flights/" + airport_codes + "/" + datetime_to_string(current_outbound_date) + "/" + datetime_to_string(current_return_date)
+print("https://www.kayak.com/flights/" + airport_codes + "/" + datetime_to_string(current_outbound_date) + "/" + datetime_to_string(current_return_date))
+driver.get(kayak_link)
 
-def DateTime2KayakDate(dateTimeDate):
-	kayakDate = dateTimeDate.strftime("%Y-%m-%d")
-	return kayakDate
+days_to_scrape = 90
+for idx in range(days_to_scrape):
+	if idx %7 == 0:
+	#There is a popup every 7 times the page loads. This closes it
+		print("--- %s seconds ---" % (time.time()-start_time))
+		close_popup(driver)
+	current_outbound_date = current_outbound_date + timedelta(days=1)
+	print(current_outbound_date)
+	scrape_page(driver,conn, current_outbound_date)
+	increment_date(driver, airport_codes, current_outbound_date, duration)
+	sleep(randint(2,4))
+driver.quit()
+print("--- %s seconds ---" % (time.time()-start_time))
 
-def replaceMultipleElements(dict, text):
-	regex = re.compile("(%s)" % "|".join(map(re.escape,dict.keys())))
-	return regex.sub(lambda mo: dict[mo.string[mo.start():mo.end()]], text)
-
-def findElementWithXPath(elementXPath):
-	element = WebDriverWait(driver, 40).until(EC.visibility_of_element_located((By.XPATH, elementXPath)))
-	return element
-
-def popupClose():
-	closeButtonXPath = '//div[contains(@class, "Common-Widgets-Dialog-Dialog R9-Overlay flightsDriveBy fromBottom visible animate")]//button[contains(@id,"dialog-close")]' #'//button[contains(@id,"dialog-close")]'
-	closeButton = findElementWithXPath(closeButtonXPath)
-	#closeButtonList = driver.find_elements_by_xpath(closeButtonXPath)
-	closeButton.click()#closeButtonList[7].click()
-
-def getMoreResults():
-	moreResultsLinkXPath = '//a[@class = "moreButton"]'
-	#driver.find_elements_by_xpath(moreResultsLinkXPath)[0].click()
-	getMoreResultsButton = findElementWithXPath(moreResultsLinkXPath)
-	getMoreResultsButton.click()
-	sleep(3)
-
-def getPrices():
-	PriceXPath = '//span[contains(@id, "price-text")]'
-	prices = driver.find_elements_by_xpath(PriceXPath)
-	prices_list = [price.text.replace('$','') for price in prices if price.text != '']
-	#Goes through the prices and gets rid of the $ sign for all the elements
-	prices_list = list(map(int, prices_list))
-	#uses the int() function of all elements in prices_list and turn it into a list
-	#print(prices_list)
-	return prices_list
-
-def getFlightDuration():
-	sleep(1)
-	outboundDurationXpath = '//div[contains(@id, "info-leg-0") ]//div[contains(@class, "duration")]/div[@class="top"]'
-	returnDurationXPath = '//div[contains(@id, "info-leg-1") ]//div[contains(@class, "duration")]/div[@class="top"]'
-	outboundDurations = driver.find_elements_by_xpath(outboundDurationXpath)
-	returnDurations = driver.find_elements_by_xpath(returnDurationXPath)
-	outboundDurations_list =[duration.text for duration in outboundDurations]
-	returnDurations_list = [duration.text for duration in returnDurations]
-	return outboundDurations_list, returnDurations_list
-
-def incrementDate():
-	#sleep(1)
-	departureDateIncXPath = '//button[contains(@id, "dateRangeInput-start-inc")]'
-	returnDateIncXPath = '//button[contains(@id, "dateRangeInput-end-inc")]'
-	submitXPath = '//div[contains(@id, "submit")]'
-	departureDateIncButton = findElementWithXPath(departureDateIncXPath)
-	departureDateIncButton.click()
-	returnDateIncButton = findElementWithXPath(returnDateIncXPath)
-	returnDateIncButton.click()
-	dateSubmitButton = findElementWithXPath(submitXPath)
-	dateSubmitButton.click()
-
-	#driver.find_elements_by_xpath(departureDateXPath)[0].click()
-	#driver.find_elements_by_xpath(returnDateXPath)[0].click()
-	#driver.find_elements_by_xpath(submitXPath)[0].click()
-
-def pageScrape():
-	#Obtains prices and flight durations of two pages of flights and creates a list of trip classes
-	#for them
-	sleep(2)
-	#Gets more results
-	getMoreResults()
-	#Get the prices and arrange them in a list of integers called prices_list
-	prices = getPrices()
-	#Gets the durations of the
-	flightDurations = getFlightDuration()
-
-	tripList = []
-	for idx, price in enumerate(prices):
-		tripList.append(Trip(idx,price,flightDurations[0][idx],flightDurations[1][idx]))
-	return tripList
-
-
-inputStartDate = input("Enter a start date in YYYY-MM-DD format")
-dateTimeStartDate = inputDate2DateTime(inputStartDate)
-kayakStartDate = DateTime2KayakDate(dateTimeStartDate)
-#print(dateTimeStartDate)
-print(kayakStartDate)
-
-Duration = 7;
-kayakStopDate = DateTime2KayakDate(dateTimeStartDate + timedelta(days=Duration))
-print(kayakStopDate)
-#Origin = 'STO'
-
-#kayakLink = str("https://www.kayak.com/explore/JFK-anywhere/" + kayakStartDate + "," + kayakStopDate)
-
-#kayakLink = str("https://www.kayak.com/explore/JFK-anywhere/" + kayakStartDate + "," + kayakStopDate)
-kayakLink = "https://www.kayak.com/flights/STO-TYO/"+kayakStartDate+"/"+kayakStopDate
-sleep(2)
-print(kayakLink)
-driver.get(kayakLink)
-#.replace('JFK', Origin)
-# need an error case here
-
-
-#[@id="c-zDn-noThanks"]
-#Closes the initial popup that shows up
-finalTripList = []
-popupClose()
-for idx,_ in enumerate(range(4)):
-	currentDate = DateTime2KayakDate(dateTimeStartDate + timedelta(days=idx))
-	print(currentDate)
-	finalTripList.append(pageScrape())
-	incrementDate()
-	for idx2,_ in enumerate(finalTripList[idx]):
-		print("range:" + str(idx) + "trip: " + str(idx2))
-		print("	" + str(finalTripList[idx][idx2].price))
-		print("	" + finalTripList[idx][idx2].outboundDuration)
-		print("	" + finalTripList[idx][idx2].returnDuration)
-	sleep(2)
-#print(finalTripList[0][0].price)
-#print(finalTripList[1][0].price)
-#print(finalTripList[0][0].price)
+#captcha = https://www.kayak.com/security/check?out=%2Fflights%2FSTO-TYO%2F2020-10-31%2F2020-11-07
+#          https://www.kayak.com/security/check?out=%2Fflights%2FSTO-TYO%2F2020-11-01%2F2020-11-08
+#//div[@class= "recaptcha-checkbox-border"]
